@@ -1,5 +1,9 @@
 export type Page =
   | "home"
+  | "aiImage"
+  | "aiAudio"
+  | "aiText"
+  | "leaderboard"
   | "pokemon";
 
 export type WebviewToBlockMessage = { type: "INIT" } | {
