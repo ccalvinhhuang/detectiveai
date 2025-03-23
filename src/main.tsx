@@ -1,6 +1,7 @@
 import { Devvit } from '@devvit/public-api';
 import { DEVVIT_SETTINGS_KEYS } from './constants.js';
 import { AIImagePage } from './pages/AIImagePage.js';
+import { Preview } from './components/Preview.js';
 
 Devvit.addSettings([
   {
@@ -20,7 +21,7 @@ Devvit.configure({
 });
 
 Devvit.addMenuItem({
-  label: 'Make my experience post',
+  label: 'Make my experience post (Ming 3/22/25)',
   location: 'subreddit',
   forUserType: 'moderator',
   onPress: async (_event, context) => {
@@ -29,8 +30,7 @@ Devvit.addMenuItem({
     const post = await reddit.submitPost({
       title: 'AI Image Detection Game',
       subredditName: subreddit.name,
-      kind: 'image',
-      videoPosterUrl: '/assets/default-snoovatar.png'
+      preview: <Preview text="Loading AI Image Detection Game..." />
     });
     ui.showToast({ text: 'Created post!' });
     ui.navigateTo(post.url);
