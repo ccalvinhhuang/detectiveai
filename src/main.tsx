@@ -21,7 +21,7 @@ Devvit.configure({
 });
 
 Devvit.addMenuItem({
-  label: 'Make my experience post (Ming 3/22/25)',
+  label: 'Make my experience post (Ming 3/22/25) 2',
   location: 'subreddit',
   forUserType: 'moderator',
   onPress: async (_event, context) => {
