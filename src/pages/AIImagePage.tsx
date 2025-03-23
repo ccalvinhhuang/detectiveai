@@ -65,7 +65,7 @@ export const AIImagePage = () => {
     return (
       <vstack height="100%" width="100%" gap="medium" alignment="center middle">
         <text size="xxlarge" weight="bold">All done!</text>
-        <text>You've completed the challenge!</text>
+        <text>You've completed the challenge! I Love Vibhas!!!</text>
         <text>Your score: {score} / 1</text>
         <hstack gap="large">
           <button
