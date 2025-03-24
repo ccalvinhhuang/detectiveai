@@ -6,6 +6,7 @@ import tailwind from '@tailwindcss/vite'
 export default defineConfig({
   plugins: [tailwind()],
   root: path.join(__dirname, "src"), // Point to src directory
+  publicDir: path.join(__dirname, "assets"), // Include assets folder
   build: {
     outDir: path.join(__dirname, "dist"), // Output to dist directory
     emptyOutDir: true, // Clean the output directory before each build
