@@ -11,6 +11,12 @@ Devvit.addSettings([
     isSecret: true,
     scope: 'app',
   },
+  {
+    name: DEVVIT_SETTINGS_KEYS.R2_BUCKET_URL,
+    label: 'R2 Bucket URL (e.g., https://detectivebucket.r2.dev)',
+    type: 'string',
+    scope: 'app',
+  },
 ]);
 
 Devvit.configure({
