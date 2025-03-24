@@ -19,26 +19,25 @@ export const AIImagePage = () => {
     { 
       id: 'gymnastics1', 
       label: 'Gymnastics Shot 1', 
-      // Use public image URLs that are known to work with Reddit
-      src: 'https://hips.hearstapps.com/hmg-prod/images/dog-puppy-on-garden-royalty-free-image-1586966191.jpg?crop=0.752xw:1.00xh;0.175xw,0&resize=1200:*',
+      src: 'output_images_2061597_gymnastics_PIXABAY_0.png',
       isAI: false 
     },
     {
       id: 'gymnastics2',
       label: 'Gymnastics Shot 2',
-      src: 'https://hips.hearstapps.com/hmg-prod/images/dog-puppy-on-garden-royalty-free-image-1586966191.jpg?crop=0.752xw:1.00xh;0.175xw,0&resize=1200:*',
+      src: 'output_images_2061597_gymnastics_FAL_flux-pro_v1.1-ultra_1.png',
       isAI: true,
     },
     {
       id: 'gymnastics3',
       label: 'Gymnastics Shot 3',
-      src: 'https://hips.hearstapps.com/hmg-prod/images/dog-puppy-on-garden-royalty-free-image-1586966191.jpg?crop=0.752xw:1.00xh;0.175xw,0&resize=1200:*',
+      src: 'output_images_2061597_gymnastics_FAL_flux-pro_v1.1_0.png',
       isAI: true,
     },
     { 
       id: 'gymnastics4', 
       label: 'Gymnastics Shot 4', 
-      src: 'https://hips.hearstapps.com/hmg-prod/images/dog-puppy-on-garden-royalty-free-image-1586966191.jpg?crop=0.752xw:1.00xh;0.175xw,0&resize=1200:*', 
+      src: 'output_images_2061597_gymnastics_FAL_flux_dev_2.png', 
       isAI: false 
     },
   ];
@@ -127,7 +126,7 @@ export const AIImagePage = () => {
             return (
               <vstack key={entry.id} gap="small" alignment="center middle" width="160px">
                 <image 
-                  url={entry.src}
+                  url= {entry.src}
                   imageHeight={150} 
                   imageWidth={150}
                 />
