@@ -9,38 +9,112 @@ type ImageEntry = {
   isAI: boolean;
 };
 
+/**
+ * Groups images by their category based on filename patterns.
+ * Filenames follow the pattern: output_images_[ID]_[CATEGORY]_[SOURCE]_[INDEX].png
+ */
+function groupImagesByCategory(fileList: string[]): Record<string, string[]> {
+  const groupedImages: Record<string, string[]> = {};
+  
+  fileList.forEach(filename => {
+    // Parse category from filename
+    const match = filename.match(/output_images_\d+_([^_]+)_/);
+    if (match && match[1]) {
+      const category = match[1];
+      if (!groupedImages[category]) {
+        groupedImages[category] = [];
+      }
+      groupedImages[category].push(filename);
+    }
+  });
+  
+  return groupedImages;
+}
+
+/**
+ * Selects a random category that has at least 4 images
+ */
+function selectRandomCategory(groupedImages: Record<string, string[]>): string {
+  const eligibleCategories = Object.keys(groupedImages).filter(
+    category => groupedImages[category].length >= 4
+  );
+  
+  if (eligibleCategories.length === 0) {
+    // Fallback to a category with the most images if none have 4+
+    const categories = Object.keys(groupedImages);
+    categories.sort((a, b) => 
+      groupedImages[b].length - groupedImages[a].length
+    );
+    return categories[0] || 'gymnastics'; // Fallback to gymnastics if no categories
+  }
+  
+  const randomIndex = Math.floor(Math.random() * eligibleCategories.length);
+  return eligibleCategories[randomIndex];
+}
+
+/**
+ * Creates ImageEntry objects from filenames
+ */
+function createImageEntries(filenames: string[]): ImageEntry[] {
+  return filenames.map((filename, index) => {
+    // Determine if it's AI based on the filename (not containing PIXABAY)
+    const isAI = !filename.includes('PIXABAY');
+    
+    // Extract the category from the filename for the label
+    const categoryMatch = filename.match(/output_images_\d+_([^_]+)_/);
+    const category = categoryMatch ? categoryMatch[1] : 'Image';
+    
+    return {
+      id: `image${index}`,
+      label: `${category} Shot ${index + 1}`,
+      src: filename,
+      isAI
+    };
+  });
+}
+
+/**
+ * Generate random images from the same category
+ */
+function generateRandomImages(): ImageEntry[] {
+  // These are all the available image files - in a real app, this would be fetched dynamically
+  const availableImages = [
+    'output_images_2061597_gymnastics_FAL_flux-pro_v1.1-ultra_1.png',
+    'output_images_2061597_gymnastics_FAL_flux-pro_v1.1_0.png',
+    'output_images_2061597_gymnastics_FAL_flux_dev_2.png',
+    'output_images_2061597_gymnastics_PIXABAY_0.png',
+    'output_images_224317_Butterfly_PIXABAY_0.png',
+    'output_images_224317_Butterfly_PIXABAY_1.png',
+    'output_images_224317_Butterfly_PIXABAY_2.png',
+    'output_images_224317_Butterfly_PIXABAY_3.png',
+    'output_images_7781489_Whale_FAL_flux-pro_v1.1_2.png',
+    'output_images_7781489_Whale_FAL_flux_dev_0.png',
+    'output_images_7781489_Whale_FAL_imagen3_1.png',
+    'output_images_7781489_Whale_PIXABAY_0.png'
+  ];
+  
+  // Group images by category
+  const groupedImages = groupImagesByCategory(availableImages);
+  
+  // Select a random category with at least 4 images
+  const selectedCategory = selectRandomCategory(groupedImages);
+  
+  // Get all images from the selected category
+  const categoryImages = groupedImages[selectedCategory] || [];
+  
+  // Shuffle and select the first 4 images
+  const shuffledImages = [...categoryImages].sort(() => 0.5 - Math.random());
+  const selectedImages = shuffledImages.slice(0, 4);
+  
+  // Create image entry objects
+  return createImageEntries(selectedImages);
+}
+
 export const AIImagePage = () => {
   const [selected, setSelected] = useState<string[]>([]);
   const [score, setScore] = useState(0);
   const [isGameFinished, setIsGameFinished] = useState(false);
-  
-  /** Single round of 4 images */
-  const images: ImageEntry[] = [
-    { 
-      id: 'gymnastics1', 
-      label: 'Gymnastics Shot 1', 
-      src: 'output_images_2061597_gymnastics_PIXABAY_0.png',
-      isAI: false 
-    },
-    {
-      id: 'gymnastics2',
-      label: 'Gymnastics Shot 2',
-      src: 'output_images_2061597_gymnastics_FAL_flux-pro_v1.1-ultra_1.png',
-      isAI: true,
-    },
-    {
-      id: 'gymnastics3',
-      label: 'Gymnastics Shot 3',
-      src: 'output_images_2061597_gymnastics_FAL_flux-pro_v1.1_0.png',
-      isAI: true,
-    },
-    { 
-      id: 'gymnastics4', 
-      label: 'Gymnastics Shot 4', 
-      src: 'output_images_2061597_gymnastics_FAL_flux_dev_2.png', 
-      isAI: true 
-    },
-  ];
+  const [images, setImages] = useState<ImageEntry[]>(generateRandomImages());
 
   function toggleSelected(id: string) {
     setSelected((prev) => {
@@ -71,13 +145,18 @@ export const AIImagePage = () => {
     // Calculate score out of 4
     let userScore = 4;
     
-    // Deduct a point for each real image incorrectly selected as AI
-    const incorrectlySelectedRealImages = selected.filter(id => realImageIDs.includes(id));
-    userScore -= incorrectlySelectedRealImages.length;
-    
-    // Deduct a point for each AI image that wasn't selected
-    const missedAIImages = aiImageIDs.filter(id => !selected.includes(id));
-    userScore -= missedAIImages.length;
+    // Special case: If there are no AI images and user selected none, they get a perfect score
+    if (aiImageIDs.length === 0 && selected.length === 0) {
+      userScore = 4;
+    } else {
+      // Deduct a point for each real image incorrectly selected as AI
+      const incorrectlySelectedRealImages = selected.filter(id => realImageIDs.includes(id));
+      userScore -= incorrectlySelectedRealImages.length;
+      
+      // Deduct a point for each AI image that wasn't selected
+      const missedAIImages = aiImageIDs.filter(id => !selected.includes(id));
+      userScore -= missedAIImages.length;
+    }
     
     // Ensure score isn't negative
     userScore = Math.max(0, userScore);
@@ -154,6 +233,9 @@ export const AIImagePage = () => {
               setScore(0);
               setSelected([]);
               setIsGameFinished(false);
+              
+              // Generate new random images from the same category
+              setImages(generateRandomImages());
             }}
             size="medium"
           >
@@ -170,7 +252,7 @@ export const AIImagePage = () => {
     <vstack height="100%" width="100%" gap="small" alignment="center top">
       <spacer size="medium" />
       <text size="large" weight="bold">Spot the AI-Generated Images!</text>
-      <text>Select ALL images that you believe were created by AI</text>
+      <text>Select ALL images that you believe were created by AI (or none if you think all are real)</text>
 
       <vstack gap="medium" width="400px" alignment="center middle">
         <hstack gap="medium" width="100%" alignment="center">
@@ -220,7 +302,6 @@ export const AIImagePage = () => {
       <vstack width="200px" alignment="center">
         <button
           onPress={handleSubmit}
-          disabled={selected.length === 0}
           size="medium"
           appearance="primary"
         >
