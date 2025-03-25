@@ -54,3 +54,25 @@ There is one last step! You need to make a new post before you can see it. You c
 
 - `AIImagePage.tsx`: The main game interface for detecting AI-generated images
 - `Preview.tsx`: Loading state component
+
+## Features
+
+### Auto-Posting
+
+The app includes an automated posting feature that creates new AI image detection game posts on a regular schedule:
+
+1. **Start Auto-Posting**: Go to your subreddit, click the three dots, and select "Start auto-posting (every 6 hours)". This will:
+   - Immediately create a first post
+   - Schedule future posts to be created automatically every 6 hours
+
+2. **Stop Auto-Posting**: If you want to stop the scheduled posts, go to your subreddit, click the three dots, and select "Stop auto-posting".
+
+3. **App Settings**: In the app settings, you can configure auto-posting behavior:
+   - `Enable auto-posting of AI detection games every 6 hours`: When enabled, auto-posting will be set up when the app is installed.
+
+**How it works**: The scheduled posts use Redis to store job IDs and the Devvit scheduler to manage timing. This ensures your community always has fresh AI detection game content without manual intervention.
+
+**Technical details**:
+- Posts are scheduled using a cron expression (`0 */6 * * *`) which runs at minute 0 of every 6th hour
+- Job IDs are stored in Redis using the key `auto_post_job_id` to track active scheduling
+- The scheduler is defined in `src/main.tsx` with implementation following the Devvit Scheduler API
