@@ -115,6 +115,7 @@ export const AIImagePage = () => {
   const [score, setScore] = useState(0);
   const [isGameFinished, setIsGameFinished] = useState(false);
   const [images, setImages] = useState<ImageEntry[]>(generateRandomImages());
+  const [viewImagesMode, setViewImagesMode] = useState(false);
 
   function toggleSelected(id: string) {
     setSelected((prev) => {
@@ -176,6 +177,69 @@ export const AIImagePage = () => {
     const goodScore = score >= 2 && score < 4;
     const lowScore = score < 2;
 
+    // If in view images mode, show a neat grid of images
+    if (viewImagesMode) {
+      return (
+        <vstack height="100%" width="100%" gap="small" alignment="center top">
+          <spacer size="medium" />
+          <text size="xlarge" weight="bold">Image Gallery</text>
+          <text>Here are the images from your game</text>
+          
+          <vstack gap="medium" width="90%" alignment="center middle">
+            <hstack gap="medium" width="100%" alignment="center">
+              {images.slice(0, 2).map((entry) => {
+                const isAI = !entry.src.includes('PIXABAY');
+                return (
+                  <vstack key={entry.id} gap="small" alignment="center middle" width="160px">
+                    <image 
+                      url={entry.src}
+                      imageHeight={160} 
+                      imageWidth={160}
+                    />
+                    <text weight="bold">{entry.label}</text>
+                    <text color={isAI ? "red" : "green"}>
+                      {isAI ? "AI-Generated" : "Real Photo"}
+                    </text>
+                  </vstack>
+                );
+              })}
+            </hstack>
+            <hstack gap="medium" width="100%" alignment="center">
+              {images.slice(2, 4).map((entry) => {
+                const isAI = !entry.src.includes('PIXABAY');
+                return (
+                  <vstack key={entry.id} gap="small" alignment="center middle" width="160px">
+                    <image 
+                      url={entry.src}
+                      imageHeight={160} 
+                      imageWidth={160}
+                    />
+                    <text weight="bold">{entry.label}</text>
+                    <text color={isAI ? "red" : "green"}>
+                      {isAI ? "AI-Generated" : "Real Photo"}
+                    </text>
+                  </vstack>
+                );
+              })}
+            </hstack>
+          </vstack>
+
+          <spacer size="medium" />
+          
+          <button
+            onPress={() => {
+              setViewImagesMode(false);
+            }}
+            size="medium"
+          >
+            Back to Results
+          </button>
+          
+          <spacer size="small" />
+        </vstack>
+      );
+    }
+
     return (
       <vstack height="100%" width="100%" gap="small" alignment="center top">
         <spacer size="medium" />
@@ -230,16 +294,11 @@ export const AIImagePage = () => {
         <hstack gap="large">
           <button
             onPress={() => {
-              setScore(0);
-              setSelected([]);
-              setIsGameFinished(false);
-              
-              // Generate new random images from the same category
-              setImages(generateRandomImages());
+              setViewImagesMode(true);
             }}
             size="medium"
           >
-            Play again
+            View Images
           </button>
         </hstack>
         
