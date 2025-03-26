@@ -1,0 +1,286 @@
+Redis
+
+You can add a database to your app to store and retrieve data. The Redis plugin is designed to be fast, scalable, and secure. It supports a subset of the full Redis API, including:
+
+Transactions for things like counting votes atomically in polls
+String operations for persisting information
+Number operations for incrementing numbers
+Sorted sets for creating leaderboards
+Hashes for managing a collection of key-value pairs
+Bitfields for efficient operation on sequences of bits
+Each app version installed on a subreddit is namespaced, which means Redis data is siloed from other subreddits. Keep in mind that there won’t be a single source of truth for all installations of your app, since each app installation can only access the data that it has stored in the Redis database.
+
+Limits and Quotas
+
+Max commands per second: 1000
+Max request size: 5 MB
+Max storage: 500 MB
+All limits are applied at a per-installation granularity.
+
+Examples
+
+Menu items
+
+Devvit.addMenuItem({
+  location: 'subreddit',
+  label: 'Test Redis',
+  onPress: async (event, { redis }) => {
+    const key = 'hello';
+    await redis.set(key, 'world');
+    const value = await redis.get(key);
+    console.log(`${key}: ${value}`);
+  },
+});
+
+Interactive posts
+
+You can copy this template to create an interactive post containing an interactive progress bar backed by Redis.
+
+Supported Redis commands
+
+NOTE
+Not all Redis features are supported. If you would like to request a specific Redis feature, please reach out to our team via modmail or Discord.
+Simple read/write
+
+Command	Action
+get	Gets the value of key.
+set	Sets key to hold a string value.
+exists	Returns number of given keys that exist.
+del	Removes the specified keys.
+type	Returns the string representation of the type of value stored at key.
+rename	Renames a key.
+Code Example
+async function simpleReadWriteExample(context: Devvit.Context) {
+  // Set a key
+  await context.redis.set('color', 'red');
+
+  // Check if a key exists
+  console.log('Key exists: ' + (await context.redis.exists('color')));
+
+  // Get a key
+  console.log('Color: ' + (await context.redis.get('color')));
+
+  // Get the type of a key
+  console.log('Type: ' + (await context.redis.type('color')));
+
+  // Delete a key
+  await context.redis.del('color');
+}
+
+Color: red
+Type: string
+
+Batch read/write
+
+Command	Action
+mGet	Returns the values of all specified keys.
+mSet	Sets the given keys to their respective values.
+Code Example
+async function batchReadWriteExample(context: Devvit.Context) {
+  // Set multiple keys at once
+  await context.redis.mSet({
+    name: 'Devvit',
+    occupation: 'Developer',
+    yearsOfExperience: '9000',
+  });
+
+  // Get multiple keys
+  console.log('Result: ' + (await context.redis.mGet(['name', 'occupation'])));
+}
+
+Result: Devvit,Developer
+
+Strings
+
+Command	Action
+getRange	Returns the substring of the string value stored at key, determined by the offsets start and end (both are inclusive).
+setRange	Overwrites part of the string stored at key, starting at the specified offset, for the entire length of value.
+strLen	Returns the length of the string value stored at key.
+Code Example
+async function stringsExample(context: Devvit.Context) {
+  // First, set 'word' to 'tacocat'
+  await context.redis.set('word', 'tacocat');
+
+  // Use getRange() to get the letters in 'word' between index 0 to 3, inclusive
+  console.log('Range from index 0 to 3: ' + (await context.redis.getRange('word', 0, 3)));
+
+  // Use setRange() to insert 'blue' at index 0
+  await context.redis.setRange('word', 0, 'blue');
+
+  console.log('Word after using setRange(): ' + (await context.redis.get('word')));
+
+  // Use strLen() to verify the word length
+  console.log('Word length: ' + (await context.redis.strLen('word')));
+}
+
+Range from index 0 to 3: taco
+Word after using setRange(): bluecat
+Word length: 7
+
+Hash
+
+Redis hashes can store up to ~ 4.2 billion key-value pairs. We recommend using hash for managing collections of key-value pairs whenever possible and iterating over it using a combination of hscan, hkeys and hgetall.
+
+Command	Action
+hGet	Returns the value associated with field in the hash stored at key.
+hMGet	Returns the value of all specified field in the hash stored at multiple keys.
+hSet	Sets the specified fields to their respective values in the hash stored at key.
+hSetNX	Sets field in the hash stored at key to value, only if field does not yet exist.ƒ
+hDel	Removes the specified fields from the hash stored at key.
+hGetAll	Returns a map of fields and their values stored in the hash.
+hKeys	Returns all field names in the hash stored at key.
+hScan	Iterates fields of Hash types and their associated values.
+hIncrBy	Increments the score of member in the sorted set stored at key by value.
+hLen	Returns the number of fields contained in the hash stored at key.
+Code Examples
+Example 1
+
+// Example using hGet(), hSet(), and hDel()
+async function hashExample1(context: Devvit.Context) {
+  // Set 'inventory' with multiple fields and values
+  await context.redis.hSet('inventory', {
+    sword: '1',
+    potion: '4',
+    shield: '2',
+    stones: '8',
+  });
+
+  // Get the value of 'shield' from 'inventory'
+  console.log('Shield count: ' + await context.redis.hGet('inventory', 'shield'));
+
+  // Get the values of both of 'shield' and 'potion' from 'inventory'
+  console.log('Shield and potion count: ' + await context.redis.hMGet('inventory', ['shield', 'potion']));
+
+  // Delete some fields from 'inventory'
+  console.log(
+    'Number of fields deleted: ' +
+      await context.redis.hDel('inventory', ['sword', 'shield', 'stones']);
+  );
+}
+
+Shield count: 2
+Shield and potion count: 2,4
+Number of fields deleted: 3
+
+Example 2
+
+// Example using hGetAll()
+async function hashExample2(context: Devvit.Context) {
+  // Set 'groceryList' to fields containing products with quantities
+  await context.redis.hSet('groceryList', {
+    eggs: '12',
+    apples: '3',
+    milk: '1',
+  });
+
+  // Get the groceryList record
+  const record = await context.redis.hGetAll('groceryList');
+
+  if (record != undefined) {
+    console.log('Eggs: ' + record.eggs + ', Apples: ' + record.apples + ', Milk: ' + record.milk);
+  }
+}
+
+Eggs: 12, Apples: 3, Milk: 1
+
+Example 3
+
+// Example using hKeys()
+async function hashExample3(context: Devvit.Context) {
+  await context.redis.hSet('prices', {
+    chair: '48',
+    desk: '95',
+    whiteboard: '23',
+  });
+
+  console.log('Keys: ' + (await context.redis.hKeys('prices')));
+}
+
+Keys: chair,desk,whiteboard
+
+Example 4
+
+// Example using hScan()
+async function hashExample4(context: Devvit.Context) {
+  await context.redis.hSet('userInfo', {
+    name: 'Bob',
+    startDate: '01-05-20',
+    totalAwards: '12',
+  });
+
+  // Scan and interate over all the fields within 'userInfo'
+  const hScanResponse = await context.redis.hScan('userInfo', 0);
+
+  hScanResponse.fieldValues.forEach((x) => {
+    console.log("Field: '" + x.field + "', Value: '" + x.value + "'");
+  });
+}
+
+Field: 'name', Value: 'Bob'
+Field: 'totalAwards', Value: '12'
+Field: 'startDate', Value: '01-05-20'
+
+Example 5
+
+// Example using hIncrBy()
+async function hashExample5(context: Devvit.Context) {
+  // Set user123's karma to 100
+  await context.redis.hSet('user123', { karma: '100' });
+
+  // Increase user123's karma by 5
+  console.log('Updated karma: ' + (await context.redis.hIncrBy('user123', 'karma', 5)));
+}
+
+Updated karma: 105
+
+Example 6
+
+// Example using hLen()
+async function hashExample6(context: Devvit.Context) {
+  await context.redis.hSet('supplies', {
+    paperclips: '25',
+    pencils: '10',
+    erasers: '5',
+    pens: '7',
+  });
+
+  console.log('Number of fields: ' + (await context.redis.hLen('supplies')));
+}
+
+Number of fields: 4
+
+Numbers
+
+Command	Action
+incrBy	Increments the number stored at key by increment.
+Code Example
+async function numbersExample(context: Devvit.Context) {
+  await context.redis.set('totalPoints', '53');
+
+  console.log('Updated points: ' + (await context.redis.incrBy('totalPoints', 100)));
+}
+
+Updated points: 153
+
+Key expiration
+
+Command	Action
+expire	Sets a timeout on key.
+expireTime	Returns the remaining seconds at which the given key will expire.
+Code Example
+async function keyExpirationExample(context: Devvit.Context) {
+  // Set a key 'product' with value 'milk'
+  await context.redis.set('product', 'milk');
+
+  // Get the current expireTime for the product
+  console.log('Expire time: ' + (await context.redis.expireTime('product')));
+
+  // Set the product to expire in 60 seconds
+  await context.redis.expire('product', 60);
+
+  // Get the updated expireTime for the product
+  console.log('Updated expire time: ' + (await context.redis.expireTime('product')));
+}
+
+Expire time: 0
+Updated expire time: 60
