@@ -6,6 +6,8 @@ import {
   POST_CATEGORY_KEY_PATTERN
 } from './constants.js';
 import { Preview } from './components/Preview.js';
+import fs from 'fs';
+import path from 'path';
 
 Devvit.addSettings([
   {
@@ -37,6 +39,35 @@ Devvit.configure({
   realtime: true,
 });
 
+// Function to get all images from output_images directory
+async function getAllImages(): Promise<string[]> {
+  const outputDir = path.join(process.cwd(), 'assets', 'output_images');
+  try {
+    const files = await fs.promises.readdir(outputDir);
+    return files.filter(file => file.endsWith('.png'));
+  } catch (error) {
+    console.error('Error reading output_images directory:', error);
+    return [];
+  }
+}
+
+// Function to extract topic from filename
+function getTopicFromFilename(filename: string): string {
+  const match = filename.match(/^\d+_([^_]+)_/);
+  return match ? match[1] : '';
+}
+
+// Function to get all images for a specific topic
+function getImagesForTopic(images: string[], topic: string): string[] {
+  return images.filter(img => getTopicFromFilename(img) === topic);
+}
+
+// Function to get unique topics from all images
+function getUniqueTopics(images: string[]): string[] {
+  const topics = new Set(images.map(img => getTopicFromFilename(img)));
+  return Array.from(topics).filter(topic => topic !== '');
+}
+
 // Define the scheduler job that will create posts every 6 hours
 Devvit.addSchedulerJob({
   name: AUTO_POST_JOB_NAME,
@@ -44,6 +75,29 @@ Devvit.addSchedulerJob({
     try {
       const { reddit, redis } = context;
       const subreddit = await reddit.getCurrentSubreddit();
+      
+      // Get all available images
+      const allImages = await getAllImages();
+      const uniqueTopics = getUniqueTopics(allImages);
+      
+      // Get the set of previously used categories
+      const previousCategories = await redis.get('previousCategories') || '[]';
+      const usedCategories = JSON.parse(previousCategories);
+      
+      // Find the first topic that hasn't been used
+      let selectedTopic = '';
+      for (const topic of uniqueTopics) {
+        if (!usedCategories.includes(topic)) {
+          selectedTopic = topic;
+          break;
+        }
+      }
+      
+      // If all topics have been used, reset the set
+      if (!selectedTopic) {
+        await redis.set('previousCategories', '[]');
+        selectedTopic = uniqueTopics[0];
+      }
       
       // Create a new post
       const post = await reddit.submitPost({
@@ -54,19 +108,36 @@ Devvit.addSchedulerJob({
       
       // Store post initialization data in Redis
       try {
-        // Initial category is randomly selected
-        const categories = ['gymnastics', 'Butterfly', 'Whale'];
-        const randomCategory = categories[Math.floor(Math.random() * categories.length)];
-        
         // Set the category key
         const postCategoryKey = `post_category:${post.id}`;
-        await redis.set(postCategoryKey, randomCategory);
+        await redis.set(postCategoryKey, selectedTopic);
+        
+        // Get images for the selected topic
+        const topicImages = getImagesForTopic(allImages, selectedTopic);
+        
+        // Use a deterministic shuffle based on postId
+        const selectedImages = topicImages
+          .map((img, index) => ({ 
+            img, 
+            sortKey: post.id ? (post.id.charCodeAt(index % post.id.length) + index) : index 
+          }))
+          .sort((a, b) => a.sortKey - b.sortKey)
+          .slice(0, 4)
+          .map(item => item.img);
+        
+        // Store the selected images in Redis
+        const postImagesKey = `post_images:${post.id}`;
+        await redis.set(postImagesKey, JSON.stringify(selectedImages));
+        
+        // Add the new category to the set of used categories
+        usedCategories.push(selectedTopic);
+        await redis.set('previousCategories', JSON.stringify(usedCategories));
         
         // Set initialization flags
         await redis.set(`post_initialized:${post.id}`, 'false');
         await redis.set(`post_category_set:${post.id}`, 'false');
         
-        console.log(`Auto-post ${post.id} assigned category: ${randomCategory} with initialization flags`);
+        console.log(`Auto-post ${post.id} assigned category: ${selectedTopic} with initialization flags`);
       } catch (error) {
         console.error('Error storing auto-post category in Redis:', error);
       }
@@ -74,41 +145,6 @@ Devvit.addSchedulerJob({
       console.log(`Auto-scheduled post created: ${post.id}`);
     } catch (error) {
       console.error('Error creating scheduled post:', error);
-    }
-  },
-});
-
-// Set up auto-posting when the app is installed (if enabled in settings)
-Devvit.addTrigger({
-  event: 'AppInstall',
-  onEvent: async (event, context) => {
-    try {
-      // Get the enable auto-posting setting
-      const settings = await context.settings.getAll();
-      const enableAutoPosting = !!settings[DEVVIT_SETTINGS_KEYS.ENABLE_AUTO_POSTING];
-      
-      if (enableAutoPosting) {
-        // Check if a job is already running
-        const existingJobId = await context.redis.get(AUTO_POST_JOB_ID_KEY);
-        if (existingJobId) {
-          // Job already exists, no need to create a new one
-          console.log('Auto-posting job already exists, skipping setup');
-          return;
-        }
-        
-        // Schedule the job to run every 6 hours
-        const jobId = await context.scheduler.runJob({
-          name: AUTO_POST_JOB_NAME,
-          cron: '0 */6 * * *'
-        });
-        
-        // Store the job ID in Redis
-        await context.redis.set(AUTO_POST_JOB_ID_KEY, jobId);
-        
-        console.log('Auto-posting job scheduled on app install');
-      }
-    } catch (error) {
-      console.error('Error setting up auto-posting on app install:', error);
     }
   },
 });
@@ -122,6 +158,13 @@ Devvit.addMenuItem({
     const { reddit, ui, redis } = context;
     const subreddit = await reddit.getCurrentSubreddit();
     
+    // Get all available images and topics
+    const allImages = await getAllImages();
+    const uniqueTopics = getUniqueTopics(allImages);
+    
+    // Randomly select a topic
+    const randomTopic = uniqueTopics[Math.floor(Math.random() * uniqueTopics.length)];
+    
     // Create the post
     const post = await reddit.submitPost({
       title: 'AI Image Detection Game',
@@ -131,19 +174,32 @@ Devvit.addMenuItem({
     
     // Store post initialization data in Redis
     try {
-      // Select a random category from our three options
-      const categories = ['gymnastics', 'Butterfly', 'Whale'];
-      const randomCategory = categories[Math.floor(Math.random() * categories.length)];
-      
       // Store the category in Redis under post_category:[postId]
       const postCategoryKey = `post_category:${post.id}`;
-      await redis.set(postCategoryKey, randomCategory);
+      await redis.set(postCategoryKey, randomTopic);
+      
+      // Get images for the selected topic
+      const topicImages = getImagesForTopic(allImages, randomTopic);
+      
+      // Use a deterministic shuffle based on postId
+      const selectedImages = topicImages
+        .map((img, index) => ({ 
+          img, 
+          sortKey: post.id ? (post.id.charCodeAt(index % post.id.length) + index) : index 
+        }))
+        .sort((a, b) => a.sortKey - b.sortKey)
+        .slice(0, 4)
+        .map(item => item.img);
+      
+      // Store the selected images in Redis
+      const postImagesKey = `post_images:${post.id}`;
+      await redis.set(postImagesKey, JSON.stringify(selectedImages));
       
       // Set initialization flags
       await redis.set(`post_initialized:${post.id}`, 'false');
       await redis.set(`post_category_set:${post.id}`, 'false');
       
-      console.log(`Post ${post.id} assigned category: ${randomCategory} with initialization flags`);
+      console.log(`Post ${post.id} assigned category: ${randomTopic} with initialization flags`);
     } catch (error) {
       console.error('Error storing category in Redis:', error);
     }
@@ -279,49 +335,6 @@ Devvit.addCustomPostType({
     };
 
     /**
-     * Groups images by their category based on filename patterns.
-     * Filenames follow the pattern: output_images_[ID]_[CATEGORY]_[SOURCE]_[INDEX].png
-     */
-    function groupImagesByCategory(fileList: string[]): Record<string, string[]> {
-      const groupedImages: Record<string, string[]> = {};
-      
-      fileList.forEach(filename => {
-        // Parse category from filename
-        const match = filename.match(/output_images_\d+_([^_]+)_/);
-        if (match && match[1]) {
-          const category = match[1];
-          if (!groupedImages[category]) {
-            groupedImages[category] = [];
-          }
-          groupedImages[category].push(filename);
-        }
-      });
-      
-      return groupedImages;
-    }
-
-    /**
-     * Selects a random category that has at least 4 images
-     */
-    function selectRandomCategory(groupedImages: Record<string, string[]>): string {
-      const eligibleCategories = Object.keys(groupedImages).filter(
-        category => groupedImages[category].length >= 4
-      );
-      
-      if (eligibleCategories.length === 0) {
-        // Fallback to a category with the most images if none have 4+
-        const categories = Object.keys(groupedImages);
-        categories.sort((a, b) => 
-          groupedImages[b].length - groupedImages[a].length
-        );
-        return categories[0] || 'gymnastics'; // Fallback to gymnastics if no categories
-      }
-      
-      const randomIndex = Math.floor(Math.random() * eligibleCategories.length);
-      return eligibleCategories[randomIndex];
-    }
-
-    /**
      * Creates ImageEntry objects from filenames
      */
     function createImageEntries(filenames: string[]): ImageEntry[] {
@@ -330,7 +343,7 @@ Devvit.addCustomPostType({
         const isAI = !filename.includes('PIXABAY');
         
         // Extract the category from the filename for the label
-        const categoryMatch = filename.match(/output_images_\d+_([^_]+)_/);
+        const categoryMatch = filename.match(/^\d+_([^_]+)_/);
         const category = categoryMatch ? categoryMatch[1] : 'Image';
         
         return {
@@ -342,92 +355,40 @@ Devvit.addCustomPostType({
       });
     }
 
-    // Load category from Redis - fetch it before the component renders
-    let storedCategory: string | null = null;
-    try {
-      // This is just to initialize the variable, we'll use it later in a non-async way
-      // This will execute synchronously when the component renders
-      const postCategoryKey = `post_category:${context.postId}`;
-      context.redis.get(postCategoryKey).then(category => {
-        // We can't use the result here, but we can store it for later use
-        if (category) {
-          storedCategory = category;
-          
-          // If needed, regenerate images with the stored category
-          const newData = generateImagesFromPostId();
-          setImages(newData.images);
-          setCategory(newData.category);
-        }
-      }).catch(error => {
-        console.error('Error fetching category from Redis:', error);
-      });
-    } catch (error) {
-      console.error('Error fetching category from Redis:', error);
-    }
-    
-    // Generate the images based on postId
-    const generateImagesFromPostId = () => {
-      // Use stored category if available, otherwise generate deterministically
-      const determinedCategory = storedCategory || (() => {
-        // Generate deterministic category based on postId
-        const categories = ['gymnastics', 'Butterfly', 'Whale'];
-        let hash = 0;
-        if (context.postId) {
-          for (let i = 0; i < context.postId.length; i++) {
-            hash = (hash + context.postId.charCodeAt(i)) % categories.length;
-          }
-        }
-        return categories[hash];
-      })();
-      
-      // Use our available images
-      const availableImages = [
-        'output_images_2061597_gymnastics_FAL_flux-pro_v1.1-ultra_v1.1_1.png',
-        'output_images_2061597_gymnastics_FAL_flux-pro_v1.1_0.png',
-        'output_images_2061597_gymnastics_FAL_flux_dev_2.png',
-        'output_images_2061597_gymnastics_PIXABAY_0.png',
-        'output_images_224317_Butterfly_PIXABAY_0.png',
-        'output_images_224317_Butterfly_PIXABAY_1.png',
-        'output_images_224317_Butterfly_PIXABAY_2.png',
-        'output_images_224317_Butterfly_PIXABAY_3.png',
-        'output_images_7781489_Whale_FAL_flux-pro_v1.1_2.png',
-        'output_images_7781489_Whale_FAL_flux_dev_0.png',
-        'output_images_7781489_Whale_FAL_imagen3_1.png',
-        'output_images_7781489_Whale_PIXABAY_0.png'
-      ];
-      
-      // Group images by category
-      const groupedImages = groupImagesByCategory(availableImages);
-      
-      // Get images for the determined category
-      const categoryName = typeof determinedCategory === 'string' ? determinedCategory : 'gymnastics';
-      const categoryImages = groupedImages[categoryName] || [];
-      
-      // Use a deterministic shuffle based on postId
-      const selectedImages = categoryImages
-        .map((img: string, index: number) => ({ 
-          img, 
-          sortKey: context.postId ? (context.postId.charCodeAt(index % context.postId.length) + index) : index 
-        }))
-        .sort((a: {img: string, sortKey: number}, b: {img: string, sortKey: number}) => a.sortKey - b.sortKey)
-        .slice(0, 4)
-        .map((item: {img: string, sortKey: number}) => item.img);
-      
-      return {
-        category: determinedCategory,
-        images: createImageEntries(selectedImages)
-      };
-    };
-    
-    // Initialize our state
-    const generatedData = generateImagesFromPostId();
-    
+    // Initialize state
     const [selected, setSelected] = useState<string[]>([]);
     const [score, setScore] = useState(0);
     const [isGameFinished, setIsGameFinished] = useState(false);
-    const [images, setImages] = useState<ImageEntry[]>(generatedData.images);
+    const [images, setImages] = useState<ImageEntry[]>([]);
     const [viewImagesMode, setViewImagesMode] = useState(false);
-    const [category, setCategory] = useState<string>(typeof generatedData.category === 'string' ? generatedData.category : '');
+    const [category, setCategory] = useState<string>('');
+    const [isLoading, setIsLoading] = useState(true);
+
+    // Load images immediately
+    (async () => {
+      try {
+        // Get the category from Redis
+        const postCategoryKey = `post_category:${context.postId}`;
+        const storedCategory = await context.redis.get(postCategoryKey);
+        
+        if (storedCategory) {
+          setCategory(storedCategory);
+          
+          // Get the image paths from Redis
+          const postImagesKey = `post_images:${context.postId}`;
+          const storedImages = await context.redis.get(postImagesKey);
+          
+          if (storedImages) {
+            const imagePaths = JSON.parse(storedImages);
+            setImages(createImageEntries(imagePaths));
+          }
+        }
+      } catch (error) {
+        console.error('Error loading images:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    })();
 
     function toggleSelected(id: string) {
       setSelected((prev) => {
@@ -476,6 +437,16 @@ Devvit.addCustomPostType({
       
       setScore(userScore);
       setIsGameFinished(true);
+    }
+
+    // Show loading state
+    if (isLoading) {
+      return (
+        <vstack height="100%" width="100%" gap="small" alignment="center middle">
+          <text size="large" weight="bold">Loading...</text>
+          <text>Please wait while we prepare your game.</text>
+        </vstack>
+      );
     }
 
     if (isGameFinished) {
@@ -653,7 +624,7 @@ Devvit.addCustomPostType({
               return (
                 <vstack key={entry.id} gap="small" alignment="center middle" width="160px">
                   <image 
-                    url= {entry.src}
+                    url={entry.src}
                     imageHeight={120} 
                     imageWidth={120}
                   />
