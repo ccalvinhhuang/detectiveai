@@ -70,6 +70,8 @@ The app includes an automated posting feature that creates new AI image detectio
 3. **App Settings**: In the app settings, you can configure auto-posting behavior:
    - `Enable auto-posting of AI detection games every 6 hours`: When enabled, auto-posting will be set up when the app is installed.
 
+4. Make sure to add your images to the assets folder, and then put imageData.json with the topics as keys and the 4 image filepaths in assets as the values.
+
 **How it works**: The scheduled posts use Redis to store job IDs and the Devvit scheduler to manage timing. This ensures your community always has fresh AI detection game content without manual intervention.
 
 **Technical details**:

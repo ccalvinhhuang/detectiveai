@@ -6,6 +6,7 @@ import {
   POST_CATEGORY_KEY_PATTERN
 } from './constants.js';
 import { Preview } from './components/Preview.js';
+import imageData from './imageData.json' assert { type: 'json' };
 
 Devvit.addSettings([
   {
@@ -45,6 +46,31 @@ Devvit.addSchedulerJob({
       const { reddit, redis } = context;
       const subreddit = await reddit.getCurrentSubreddit();
       
+      // Get all available topics
+      const uniqueTopics = getUniqueTopics();
+      console.log('Available topics:', uniqueTopics);
+      
+      // Get the set of previously used categories
+      const previousCategories = await redis.get('previousCategories') || '[]';
+      const usedCategories = JSON.parse(previousCategories);
+      
+      // Find the first topic that hasn't been used
+      let selectedTopic = '';
+      for (const topic of uniqueTopics) {
+        if (!usedCategories.includes(topic)) {
+          selectedTopic = topic;
+          break;
+        }
+      }
+      
+      // If all topics have been used, reset the set
+      if (!selectedTopic) {
+        await redis.set('previousCategories', '[]');
+        selectedTopic = uniqueTopics[0];
+      }
+      
+      console.log('Selected topic:', selectedTopic);
+      
       // Create a new post
       const post = await reddit.submitPost({
         title: `AI Image Detection Game - ${new Date().toLocaleString()}`,
@@ -54,19 +80,29 @@ Devvit.addSchedulerJob({
       
       // Store post initialization data in Redis
       try {
-        // Initial category is randomly selected
-        const categories = ['gymnastics', 'Butterfly', 'Whale'];
-        const randomCategory = categories[Math.floor(Math.random() * categories.length)];
-        
         // Set the category key
         const postCategoryKey = `post_category:${post.id}`;
-        await redis.set(postCategoryKey, randomCategory);
+        await redis.set(postCategoryKey, selectedTopic);
+        console.log(`Stored category in Redis: ${selectedTopic}`);
+        
+        // Get shuffled images for the selected topic
+        const selectedImages = getShuffledImagesForTopic(selectedTopic, post.id);
+        console.log('Selected images:', selectedImages);
+        
+        // Store the selected images in Redis
+        const postImagesKey = `post_images:${post.id}`;
+        await redis.set(postImagesKey, JSON.stringify(selectedImages));
+        console.log('Stored images in Redis:', selectedImages);
+        
+        // Add the new category to the set of used categories
+        usedCategories.push(selectedTopic);
+        await redis.set('previousCategories', JSON.stringify(usedCategories));
         
         // Set initialization flags
-        await redis.set(`post_initialized:${post.id}`, 'false');
-        await redis.set(`post_category_set:${post.id}`, 'false');
+        await redis.set(`post_initialized:${post.id}`, 'true');
+        await redis.set(`post_category_set:${post.id}`, 'true');
         
-        console.log(`Auto-post ${post.id} assigned category: ${randomCategory} with initialization flags`);
+        console.log(`Auto-post ${post.id} assigned category: ${selectedTopic} with initialization flags`);
       } catch (error) {
         console.error('Error storing auto-post category in Redis:', error);
       }
@@ -115,7 +151,7 @@ Devvit.addTrigger({
 
 // Menu item to create a single post
 Devvit.addMenuItem({
-  label: 'Make my experience post MQ 3/25',
+  label: 'Make my experience post MQ 3/26',
   location: 'subreddit',
   forUserType: 'moderator',
   onPress: async (_event, context) => {
@@ -131,8 +167,8 @@ Devvit.addMenuItem({
     
     // Store post initialization data in Redis
     try {
-      // Select a random category from our three options
-      const categories = ['gymnastics', 'Butterfly', 'Whale'];
+      // Select a random category from available topics
+      const categories = getUniqueTopics();
       const randomCategory = categories[Math.floor(Math.random() * categories.length)];
       
       // Store the category in Redis under post_category:[postId]
@@ -152,6 +188,39 @@ Devvit.addMenuItem({
     ui.navigateTo(post.url);
   },
 });
+
+// Define types for our image data and sorting
+type ImageData = {
+  [key: string]: string[];
+};
+
+type ImageSortItem = {
+  img: string;
+  sortKey: number;
+};
+
+// Helper functions for image data management
+const getUniqueTopics = (): string[] => {
+  return Object.keys(imageData as ImageData);
+};
+
+const getImagesForTopic = (topic: string): string[] => {
+  return (imageData as ImageData)[topic] || [];
+};
+
+// Function to get deterministically shuffled images for a topic
+function getShuffledImagesForTopic(topic: string, postId: string): string[] {
+  const topicImages = getImagesForTopic(topic);
+  
+  return topicImages
+    .map((img: string, index: number): ImageSortItem => ({ 
+      img, 
+      sortKey: postId ? (postId.charCodeAt(index % postId.length) + index) : index 
+    }))
+    .sort((a: ImageSortItem, b: ImageSortItem) => a.sortKey - b.sortKey)
+    .slice(0, 4)
+    .map((item: ImageSortItem) => item.img);
+}
 
 // Menu item to start the auto-post scheduler
 Devvit.addMenuItem({
@@ -185,15 +254,22 @@ Devvit.addMenuItem({
       });
       
       // Store post initialization data in Redis
-      const categories = ['gymnastics', 'Butterfly', 'Whale'];
-      const randomCategory = categories[Math.floor(Math.random() * categories.length)];
+      const uniqueTopics = getUniqueTopics();
+      const randomCategory = uniqueTopics[Math.floor(Math.random() * uniqueTopics.length)];
       const postCategoryKey = `post_category:${post.id}`;
       
       await redis.set(postCategoryKey, randomCategory);
       
+      // Get shuffled images for the selected topic
+      const selectedImages = getShuffledImagesForTopic(randomCategory, post.id);
+      
+      // Store the selected images in Redis
+      const postImagesKey = `post_images:${post.id}`;
+      await redis.set(postImagesKey, JSON.stringify(selectedImages));
+      
       // Set initialization flags
-      await redis.set(`post_initialized:${post.id}`, 'false');
-      await redis.set(`post_category_set:${post.id}`, 'false');
+      await redis.set(`post_initialized:${post.id}`, 'true');
+      await redis.set(`post_category_set:${post.id}`, 'true');
       
       console.log(`Initial auto-post ${post.id} assigned category: ${randomCategory} with initialization flags`);
       
@@ -370,7 +446,7 @@ Devvit.addCustomPostType({
       // Use stored category if available, otherwise generate deterministically
       const determinedCategory = storedCategory || (() => {
         // Generate deterministic category based on postId
-        const categories = ['gymnastics', 'Butterfly', 'Whale'];
+        const categories = getUniqueTopics();
         let hash = 0;
         if (context.postId) {
           for (let i = 0; i < context.postId.length; i++) {
@@ -380,28 +456,9 @@ Devvit.addCustomPostType({
         return categories[hash];
       })();
       
-      // Use our available images
-      const availableImages = [
-        'output_images_2061597_gymnastics_FAL_flux-pro_v1.1-ultra_v1.1_1.png',
-        'output_images_2061597_gymnastics_FAL_flux-pro_v1.1_0.png',
-        'output_images_2061597_gymnastics_FAL_flux_dev_2.png',
-        'output_images_2061597_gymnastics_PIXABAY_0.png',
-        'output_images_224317_Butterfly_PIXABAY_0.png',
-        'output_images_224317_Butterfly_PIXABAY_1.png',
-        'output_images_224317_Butterfly_PIXABAY_2.png',
-        'output_images_224317_Butterfly_PIXABAY_3.png',
-        'output_images_7781489_Whale_FAL_flux-pro_v1.1_2.png',
-        'output_images_7781489_Whale_FAL_flux_dev_0.png',
-        'output_images_7781489_Whale_FAL_imagen3_1.png',
-        'output_images_7781489_Whale_PIXABAY_0.png'
-      ];
-      
-      // Group images by category
-      const groupedImages = groupImagesByCategory(availableImages);
-      
       // Get images for the determined category
       const categoryName = typeof determinedCategory === 'string' ? determinedCategory : 'gymnastics';
-      const categoryImages = groupedImages[categoryName] || [];
+      const categoryImages = getImagesForTopic(categoryName);
       
       // Use a deterministic shuffle based on postId
       const selectedImages = categoryImages
