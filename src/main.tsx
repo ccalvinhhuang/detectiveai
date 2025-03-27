@@ -662,9 +662,11 @@ Devvit.addCustomPostType({
 
       return (
         <vstack height="100%" width="100%" gap="none" alignment="center top" padding="none">
+          <spacer size="small" />
           <text size="xxlarge" weight="bold" color="#3366cc">Spot the AI-Generated Images!</text>
           <text size="small">Select ALL images that you believe were created by AI (or none if you think all are real)</text>
           <text size="small" weight="bold" color="#6c757d">Category: {category}</text>
+          <spacer size="small" />
 
           <vstack gap="small" width="95%" alignment="center middle">
             <vstack key={currentImage.id} gap="small" alignment="center middle" width="600px">
@@ -691,7 +693,7 @@ Devvit.addCustomPostType({
                 </button>
                 <button
                   onPress={currentImageIndex === images.length - 1 ? handleSubmit : handleNext}
-                  appearance={currentImageIndex === images.length - 1 ? "primary" : "secondary"}
+                  appearance={currentImageIndex === images.length - 1 ? "success" : "secondary"}
                   size="medium"
                 >
                   {currentImageIndex === images.length - 1 ? "Submit" : "Next"}
