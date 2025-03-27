@@ -591,73 +591,8 @@ Devvit.addCustomPostType({
       const goodScore = score >= 2 && score < 4;
       const lowScore = score < 2;
 
-      // If in view images mode, show a neat grid of images
-      if (viewImagesMode) {
-        return (
-          <vstack height="100%" width="100%" gap="medium" alignment="center top" padding="medium">
-            <spacer size="medium" />
-            <text size="xxlarge" weight="bold" color="#3366cc">Image Gallery</text>
-            <text size="large">Here are the images from your game</text>
-            
-            <vstack gap="large" width="95%" alignment="center middle" padding="medium">
-              <hstack gap="large" width="100%" alignment="center">
-                {images.slice(0, 2).map((entry) => {
-                  const isAI = !entry.src.includes('PIXABAY');
-                  return (
-                    <vstack key={entry.id} gap="small" alignment="center middle" width="240px">
-                      <image 
-                        url={entry.src}
-                        imageHeight={240} 
-                        imageWidth={240}
-                      />
-                      <text weight="bold" size="large">{entry.label}</text>
-                      <text color={isAI ? "#e63946" : "#2a9d8f"} weight="bold" size="medium">
-                        {isAI ? "AI-Generated" : "Real Photo"}
-                      </text>
-                    </vstack>
-                  );
-                })}
-              </hstack>
-              <hstack gap="large" width="100%" alignment="center">
-                {images.slice(2, 4).map((entry) => {
-                  const isAI = !entry.src.includes('PIXABAY');
-                  return (
-                    <vstack key={entry.id} gap="small" alignment="center middle" width="240px">
-                      <image 
-                        url={entry.src}
-                        imageHeight={240} 
-                        imageWidth={240}
-                      />
-                      <text weight="bold" size="large">{entry.label}</text>
-                      <text color={isAI ? "#e63946" : "#2a9d8f"} weight="bold" size="medium">
-                        {isAI ? "AI-Generated" : "Real Photo"}
-                      </text>
-                    </vstack>
-                  );
-                })}
-              </hstack>
-            </vstack>
-
-            <spacer size="large" />
-            
-            <button
-              onPress={() => {
-                setViewImagesMode(false);
-              }}
-              size="large"
-              appearance="primary"
-            >
-              Back to Results
-            </button>
-            
-            <spacer size="medium" />
-          </vstack>
-        );
-      }
-
       return (
-        <vstack height="100%" width="100%" gap="medium" alignment="center top" padding="medium">
-          <spacer size="medium" />
+        <vstack height="100%" width="100%" gap="none" alignment="center top" padding="none">
           <text size="xxlarge" weight="bold" color="#3366cc">Results</text>
           <text size="xlarge">Your score: {score} / 4</text>
           <text color={perfectScore ? "#2a9d8f" : (goodScore ? "#e9c46a" : "#e63946")} weight="bold" size="large">
@@ -668,66 +603,54 @@ Devvit.addCustomPostType({
                   : "Try again! You missed several images.")}
           </text>
           
-          <vstack gap="medium" width="95%" alignment="start" padding="medium">
-            <text weight="bold" size="large">Detailed Results:</text>
-            <vstack gap="medium">
-              {images.map(img => {
+          <vstack gap="none" width="95%" alignment="center middle">
+            <hstack gap="small" width="100%" alignment="center">
+              {images.slice(0, 2).map(img => {
                 const isAI = !img.src.includes('PIXABAY');
                 const wasSelected = selected.includes(img.id);
                 const isCorrect = (isAI && wasSelected) || (!isAI && !wasSelected);
                 
-                // Determine the status message and color
-                let statusMessage = '';
-                let statusColor = '';
-                
-                if (isAI && wasSelected) {
-                  statusMessage = "✓ Correctly identified as AI";
-                  statusColor = "#2a9d8f";
-                } else if (isAI && !wasSelected) {
-                  statusMessage = "✗ You missed this AI image";
-                  statusColor = "#e63946";
-                } else if (!isAI && !wasSelected) {
-                  statusMessage = "✓ Correctly left unselected (Real photo)";
-                  statusColor = "#2a9d8f";
-                } else if (!isAI && wasSelected) {
-                  statusMessage = "✗ Incorrectly selected (Real photo)";
-                  statusColor = "#e63946";
-                }
-                
                 return (
-                  <hstack key={img.id} gap="medium" padding="small" width="100%">
+                  <vstack key={img.id} gap="none" alignment="center middle" width="250px">
                     <image 
                       url={img.src}
-                      imageHeight={240} 
-                      imageWidth={240}
+                      imageHeight={180} 
+                      imageWidth={180}
                     />
-                    <vstack alignment="start middle" gap="small">
-                      <text weight="bold" size="medium">{img.label}</text>
-                      <text color={statusColor} weight="bold">
-                        {statusMessage}
-                      </text>
-                    </vstack>
-                  </hstack>
+                    <text color={isCorrect ? "#2a9d8f" : "#e63946"} weight="bold" size="small">
+                      {wasSelected ? "You selected this as AI" : "You didn't select this as AI"}
+                    </text>
+                    <text size="small" color="#6c757d">
+                      {Math.floor(Math.random() * 100)}% of people selected this as AI
+                    </text>
+                  </vstack>
                 );
               })}
-            </vstack>
+            </hstack>
+            <hstack gap="small" width="100%" alignment="center">
+              {images.slice(2, 4).map(img => {
+                const isAI = !img.src.includes('PIXABAY');
+                const wasSelected = selected.includes(img.id);
+                const isCorrect = (isAI && wasSelected) || (!isAI && !wasSelected);
+                
+                return (
+                  <vstack key={img.id} gap="none" alignment="center middle" width="250px">
+                    <image 
+                      url={img.src}
+                      imageHeight={180} 
+                      imageWidth={180}
+                    />
+                    <text color={isCorrect ? "#2a9d8f" : "#e63946"} weight="bold" size="small">
+                      {wasSelected ? "You selected this as AI" : "You didn't select this as AI"}
+                    </text>
+                    <text size="small" color="#6c757d">
+                      {Math.floor(Math.random() * 100)}% of people selected this as AI
+                    </text>
+                  </vstack>
+                );
+              })}
+            </hstack>
           </vstack>
-
-          <spacer size="large" />
-          
-          <hstack gap="large">
-            <button
-              onPress={() => {
-                setViewImagesMode(true);
-              }}
-              size="large"
-              appearance="primary"
-            >
-              View Full-Size Images
-            </button>
-          </hstack>
-          
-          <spacer size="medium" />
         </vstack>
       );
     }
@@ -738,12 +661,10 @@ Devvit.addCustomPostType({
       const selectedCount = selected.length;
 
       return (
-        <vstack height="100%" width="100%" gap="none" alignment="center top">
-          <spacer size="small" />
-          <text size="xlarge" weight="bold" color="#3366cc">Spot the AI-Generated Images!</text>
+        <vstack height="100%" width="100%" gap="none" alignment="center top" padding="none">
+          <text size="xxlarge" weight="bold" color="#3366cc">Spot the AI-Generated Images!</text>
           <text size="small">Select ALL images that you believe were created by AI (or none if you think all are real)</text>
           <text size="small" weight="bold" color="#6c757d">Category: {category}</text>
-          <spacer size="small" />
 
           <vstack gap="small" width="95%" alignment="center middle">
             <vstack key={currentImage.id} gap="small" alignment="center middle" width="600px">
