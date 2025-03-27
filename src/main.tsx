@@ -521,6 +521,7 @@ Devvit.addCustomPostType({
     const [images, setImages] = useState<ImageEntry[]>(generatedData.images);
     const [viewImagesMode, setViewImagesMode] = useState(false);
     const [category, setCategory] = useState<string>(typeof generatedData.category === 'string' ? generatedData.category : '');
+    const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
 
     function toggleSelected(id: string) {
       setSelected((prev) => {
@@ -571,6 +572,14 @@ Devvit.addCustomPostType({
       setIsGameFinished(true);
     }
 
+    function handleNext() {
+      setCurrentImageIndex((prev) => Math.min(prev + 1, images.length - 1));
+    }
+
+    function handlePrevious() {
+      setCurrentImageIndex((prev) => Math.max(prev - 1, 0));
+    }
+
     if (isGameFinished) {
       // Determine which images are AI after submission
       const aiImageIDs = images
@@ -585,42 +594,42 @@ Devvit.addCustomPostType({
       // If in view images mode, show a neat grid of images
       if (viewImagesMode) {
         return (
-          <vstack height="100%" width="100%" gap="small" alignment="center top">
+          <vstack height="100%" width="100%" gap="medium" alignment="center top" padding="medium">
             <spacer size="medium" />
-            <text size="xlarge" weight="bold">Image Gallery</text>
-            <text>Here are the images from your game</text>
+            <text size="xxlarge" weight="bold" color="#3366cc">Image Gallery</text>
+            <text size="large">Here are the images from your game</text>
             
-            <vstack gap="medium" width="90%" alignment="center middle">
-              <hstack gap="medium" width="100%" alignment="center">
+            <vstack gap="large" width="95%" alignment="center middle" padding="medium">
+              <hstack gap="large" width="100%" alignment="center">
                 {images.slice(0, 2).map((entry) => {
                   const isAI = !entry.src.includes('PIXABAY');
                   return (
-                    <vstack key={entry.id} gap="small" alignment="center middle" width="160px">
+                    <vstack key={entry.id} gap="small" alignment="center middle" width="240px">
                       <image 
                         url={entry.src}
-                        imageHeight={160} 
-                        imageWidth={160}
+                        imageHeight={240} 
+                        imageWidth={240}
                       />
-                      <text weight="bold">{entry.label}</text>
-                      <text color={isAI ? "red" : "green"}>
+                      <text weight="bold" size="large">{entry.label}</text>
+                      <text color={isAI ? "#e63946" : "#2a9d8f"} weight="bold" size="medium">
                         {isAI ? "AI-Generated" : "Real Photo"}
                       </text>
                     </vstack>
                   );
                 })}
               </hstack>
-              <hstack gap="medium" width="100%" alignment="center">
+              <hstack gap="large" width="100%" alignment="center">
                 {images.slice(2, 4).map((entry) => {
                   const isAI = !entry.src.includes('PIXABAY');
                   return (
-                    <vstack key={entry.id} gap="small" alignment="center middle" width="160px">
+                    <vstack key={entry.id} gap="small" alignment="center middle" width="240px">
                       <image 
                         url={entry.src}
-                        imageHeight={160} 
-                        imageWidth={160}
+                        imageHeight={240} 
+                        imageWidth={240}
                       />
-                      <text weight="bold">{entry.label}</text>
-                      <text color={isAI ? "red" : "green"}>
+                      <text weight="bold" size="large">{entry.label}</text>
+                      <text color={isAI ? "#e63946" : "#2a9d8f"} weight="bold" size="medium">
                         {isAI ? "AI-Generated" : "Real Photo"}
                       </text>
                     </vstack>
@@ -629,28 +638,29 @@ Devvit.addCustomPostType({
               </hstack>
             </vstack>
 
-            <spacer size="medium" />
+            <spacer size="large" />
             
             <button
               onPress={() => {
                 setViewImagesMode(false);
               }}
-              size="medium"
+              size="large"
+              appearance="primary"
             >
               Back to Results
             </button>
             
-            <spacer size="small" />
+            <spacer size="medium" />
           </vstack>
         );
       }
 
       return (
-        <vstack height="100%" width="100%" gap="small" alignment="center top">
+        <vstack height="100%" width="100%" gap="medium" alignment="center top" padding="medium">
           <spacer size="medium" />
-          <text size="xlarge" weight="bold">All done!</text>
-          <text>Your score: {score} / 4</text>
-          <text color={perfectScore ? "green" : (goodScore ? "orange" : "red")}>
+          <text size="xxlarge" weight="bold" color="#3366cc">Results</text>
+          <text size="xlarge">Your score: {score} / 4</text>
+          <text color={perfectScore ? "#2a9d8f" : (goodScore ? "#e9c46a" : "#e63946")} weight="bold" size="large">
             {perfectScore 
               ? "Perfect! You correctly identified all images!" 
               : (goodScore 
@@ -658,9 +668,9 @@ Devvit.addCustomPostType({
                   : "Try again! You missed several images.")}
           </text>
           
-          <vstack gap="small" width="90%" alignment="start">
-            <text weight="bold">Results:</text>
-            <vstack gap="small">
+          <vstack gap="medium" width="95%" alignment="start" padding="medium">
+            <text weight="bold" size="large">Detailed Results:</text>
+            <vstack gap="medium">
               {images.map(img => {
                 const isAI = !img.src.includes('PIXABAY');
                 const wasSelected = selected.includes(img.id);
@@ -672,67 +682,133 @@ Devvit.addCustomPostType({
                 
                 if (isAI && wasSelected) {
                   statusMessage = "✓ Correctly identified as AI";
-                  statusColor = "green";
+                  statusColor = "#2a9d8f";
                 } else if (isAI && !wasSelected) {
                   statusMessage = "✗ You missed this AI image";
-                  statusColor = "red";
+                  statusColor = "#e63946";
                 } else if (!isAI && !wasSelected) {
                   statusMessage = "✓ Correctly left unselected (Real photo)";
-                  statusColor = "green";
+                  statusColor = "#2a9d8f";
                 } else if (!isAI && wasSelected) {
                   statusMessage = "✗ Incorrectly selected (Real photo)";
-                  statusColor = "red";
+                  statusColor = "#e63946";
                 }
                 
                 return (
-                  <vstack key={img.id} gap="small" padding="small" width="100%">
-                    <text weight="bold">{img.label}</text>
-                    <text color={statusColor}>{statusMessage}</text>
-                  </vstack>
+                  <hstack key={img.id} gap="medium" padding="small" width="100%">
+                    <image 
+                      url={img.src}
+                      imageHeight={240} 
+                      imageWidth={240}
+                    />
+                    <vstack alignment="start middle" gap="small">
+                      <text weight="bold" size="medium">{img.label}</text>
+                      <text color={statusColor} weight="bold">
+                        {statusMessage}
+                      </text>
+                    </vstack>
+                  </hstack>
                 );
               })}
             </vstack>
           </vstack>
 
-          <spacer size="medium" />
+          <spacer size="large" />
           
           <hstack gap="large">
             <button
               onPress={() => {
                 setViewImagesMode(true);
               }}
-              size="medium"
+              size="large"
+              appearance="primary"
             >
-              View Images
+              View Full-Size Images
             </button>
           </hstack>
           
+          <spacer size="medium" />
+        </vstack>
+      );
+    }
+
+    if (!isGameFinished) {
+      const currentImage = images[currentImageIndex];
+      const isSelected = selected.includes(currentImage.id);
+      const selectedCount = selected.length;
+
+      return (
+        <vstack height="100%" width="100%" gap="none" alignment="center top">
           <spacer size="small" />
+          <text size="xlarge" weight="bold" color="#3366cc">Spot the AI-Generated Images!</text>
+          <text size="small">Select ALL images that you believe were created by AI (or none if you think all are real)</text>
+          <text size="small" weight="bold" color="#6c757d">Category: {category}</text>
+          <spacer size="small" />
+
+          <vstack gap="small" width="95%" alignment="center middle">
+            <vstack key={currentImage.id} gap="small" alignment="center middle" width="600px">
+              <image 
+                url={currentImage.src}
+                imageHeight={350} 
+                imageWidth={600}
+              />
+              <hstack gap="large" width="100%" alignment="center">
+                <button
+                  onPress={handlePrevious}
+                  appearance="secondary"
+                  size="medium"
+                  disabled={currentImageIndex === 0}
+                >
+                  Previous
+                </button>
+                <button
+                  onPress={() => toggleSelected(currentImage.id)}
+                  appearance={isSelected ? "primary" : "secondary"}
+                  size="medium"
+                >
+                  AI Generated
+                </button>
+                <button
+                  onPress={currentImageIndex === images.length - 1 ? handleSubmit : handleNext}
+                  appearance={currentImageIndex === images.length - 1 ? "primary" : "secondary"}
+                  size="medium"
+                >
+                  {currentImageIndex === images.length - 1 ? "Submit" : "Next"}
+                </button>
+              </hstack>
+
+              <hstack gap="medium" width="100%" alignment="center">
+                <text size="medium" color="#6c757d">Image {currentImageIndex + 1} of {images.length}</text>
+                <text size="medium" color="#6c757d">Selected as AI: {selectedCount} image{selectedCount !== 1 ? 's' : ''}</text>
+              </hstack>
+            </vstack>
+          </vstack>
         </vstack>
       );
     }
 
     return (
-      <vstack height="100%" width="100%" gap="small" alignment="center top">
-        <spacer size="medium" />
-        <text size="large" weight="bold">Spot the AI-Generated Images!</text>
-        <text>Select ALL images that you believe were created by AI (or none if you think all are real)</text>
-        {category && <text size="medium" weight="bold">Category: {category}</text>}
+      <vstack height="100%" width="100%" gap="small" alignment="center top" padding="small">
+        <spacer size="small" />
+        <text size="xlarge" weight="bold" color="#3366cc">Spot the AI-Generated Images!</text>
+        <text size="medium">Select ALL images that you believe were created by AI (or none if you think all are real)</text>
+        {category && <text size="medium" weight="bold" color="#6c757d">Category: {category}</text>}
 
-        <vstack gap="medium" width="400px" alignment="center middle">
+        <vstack gap="medium" width="95%" alignment="center middle" padding="small">
           <hstack gap="medium" width="100%" alignment="center">
             {images.slice(0, 2).map((entry) => {
               const isSelected = selected.includes(entry.id);
               return (
-                <vstack key={entry.id} gap="small" alignment="center middle" width="160px">
+                <vstack key={entry.id} gap="small" alignment="center middle" width="240px">
                   <image 
                     url={entry.src}
-                    imageHeight={120} 
-                    imageWidth={120}
+                    imageHeight={200} 
+                    imageWidth={200}
                   />
                   <button
                     onPress={() => toggleSelected(entry.id)}
                     appearance={isSelected ? "primary" : "secondary"}
+                    size="medium"
                   >
                     {entry.label}
                   </button>
@@ -744,15 +820,16 @@ Devvit.addCustomPostType({
             {images.slice(2, 4).map((entry) => {
               const isSelected = selected.includes(entry.id);
               return (
-                <vstack key={entry.id} gap="small" alignment="center middle" width="160px">
+                <vstack key={entry.id} gap="small" alignment="center middle" width="240px">
                   <image 
-                    url= {entry.src}
-                    imageHeight={120} 
-                    imageWidth={120}
+                    url={entry.src}
+                    imageHeight={200} 
+                    imageWidth={200}
                   />
                   <button
                     onPress={() => toggleSelected(entry.id)}
                     appearance={isSelected ? "primary" : "secondary"}
+                    size="medium"
                   >
                     {entry.label}
                   </button>
@@ -762,17 +839,18 @@ Devvit.addCustomPostType({
           </hstack>
         </vstack>
 
-        <spacer size="small" />
+        <spacer size="medium" />
 
-        <vstack width="200px" alignment="center">
+        <vstack width="300px" alignment="center">
           <button
             onPress={handleSubmit}
-            size="medium"
+            size="large"
             appearance="primary"
           >
             SUBMIT
           </button>
         </vstack>
+        <spacer size="small" />
       </vstack>
     );
   },
