@@ -6,7 +6,7 @@ import {
   POST_CATEGORY_KEY_PATTERN
 } from './constants.js';
 import { Preview } from './components/Preview.js';
-import imageData from './imageData.json' assert { type: 'json' };
+import imageData from './imageData.json' with { type: 'json' };
 
 Devvit.addSettings([
   {
@@ -522,6 +522,38 @@ Devvit.addCustomPostType({
     const [viewImagesMode, setViewImagesMode] = useState(false);
     const [category, setCategory] = useState<string>(typeof generatedData.category === 'string' ? generatedData.category : '');
     const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
+    const [aiPercentages, setAiPercentages] = useState<number[]>([0, 0, 0, 0]);
+
+    // Load initial percentages when component mounts
+    if (context.postId) {
+      // Use Promise.resolve().then() to handle async operations
+      Promise.resolve().then(async () => {
+        try {
+          // Get total submissions and AI selections to calculate percentages
+          const submissionsKey = `submissions:${context.postId}`;
+          const totalSubmissions = await context.redis.get(submissionsKey);
+          
+          if (totalSubmissions) {
+            const aiSelectionCounts = await Promise.all(
+              images.map((_, index) => 
+                context.redis.get(`ai_selections:${context.postId}:${index}`)
+              )
+            );
+
+            // Calculate percentages
+            const newPercentages = aiSelectionCounts.map(count => {
+              const selections = parseInt(count || '0');
+              const total = parseInt(totalSubmissions);
+              return Math.round((selections / total) * 100);
+            });
+
+            setAiPercentages(newPercentages);
+          }
+        } catch (error) {
+          console.error('Error loading initial percentages:', error);
+        }
+      });
+    }
 
     function toggleSelected(id: string) {
       setSelected((prev) => {
@@ -534,8 +566,40 @@ Devvit.addCustomPostType({
       });
     }
 
-    function handleSubmit() {
+    async function handleSubmit() {
       if (isGameFinished) return;
+
+      // Increment total submissions counter for this post
+      const submissionsKey = `submissions:${context.postId}`;
+      await context.redis.incrBy(submissionsKey, 1);
+
+      // For each image, increment its AI selection counter if it was selected
+      const aiSelectionPromises = images.map(async (img, index) => {
+        if (selected.includes(img.id)) {
+          const aiSelectionsKey = `ai_selections:${context.postId}:${index}`;
+          await context.redis.incrBy(aiSelectionsKey, 1);
+        }
+      });
+
+      // Wait for all Redis operations to complete
+      await Promise.all(aiSelectionPromises);
+
+      // Get total submissions and AI selections to calculate percentages
+      const totalSubmissions = await context.redis.get(submissionsKey);
+      const aiSelectionCounts = await Promise.all(
+        images.map((_, index) => 
+          context.redis.get(`ai_selections:${context.postId}:${index}`)
+        )
+      );
+
+      // Calculate percentages
+      const newPercentages = aiSelectionCounts.map(count => {
+        const selections = parseInt(count || '0');
+        const total = parseInt(totalSubmissions || '1');
+        return Math.round((selections / total) * 100);
+      });
+
+      setAiPercentages(newPercentages);
 
       // Determine which images are AI by checking if they DON'T have "PIXABAY" in the filename
       const aiImages = images.map(img => ({
@@ -543,31 +607,21 @@ Devvit.addCustomPostType({
         isAI: !img.src.includes('PIXABAY')
       }));
 
-      // Get the IDs of the actual AI images (AI-generated)
+      // Rest of the scoring logic
       const aiImageIDs = aiImages.filter((img) => img.isAI).map((img) => img.id);
-      
-      // Get the IDs of the real images (not AI-generated)
       const realImageIDs = aiImages.filter((img) => !img.isAI).map((img) => img.id);
-      
-      // Calculate score out of 4
       let userScore = 4;
       
-      // Special case: If there are no AI images and user selected none, they get a perfect score
       if (aiImageIDs.length === 0 && selected.length === 0) {
         userScore = 4;
       } else {
-        // Deduct a point for each real image incorrectly selected as AI
         const incorrectlySelectedRealImages = selected.filter(id => realImageIDs.includes(id));
         userScore -= incorrectlySelectedRealImages.length;
-        
-        // Deduct a point for each AI image that wasn't selected
         const missedAIImages = aiImageIDs.filter(id => !selected.includes(id));
         userScore -= missedAIImages.length;
       }
       
-      // Ensure score isn't negative
       userScore = Math.max(0, userScore);
-      
       setScore(userScore);
       setIsGameFinished(true);
     }
@@ -605,7 +659,7 @@ Devvit.addCustomPostType({
           
           <vstack gap="none" width="95%" alignment="center middle">
             <hstack gap="small" width="100%" alignment="center">
-              {images.slice(0, 2).map(img => {
+              {images.slice(0, 2).map((img, index) => {
                 const isAI = !img.src.includes('PIXABAY');
                 const wasSelected = selected.includes(img.id);
                 const isCorrect = (isAI && wasSelected) || (!isAI && !wasSelected);
@@ -621,14 +675,14 @@ Devvit.addCustomPostType({
                       {wasSelected ? "You selected this as AI" : "You didn't select this as AI"}
                     </text>
                     <text size="small" color="#6c757d">
-                      {Math.floor(Math.random() * 100)}% of people selected this as AI
+                      {aiPercentages[index]}% of people selected this as AI
                     </text>
                   </vstack>
                 );
               })}
             </hstack>
             <hstack gap="small" width="100%" alignment="center">
-              {images.slice(2, 4).map(img => {
+              {images.slice(2, 4).map((img, index) => {
                 const isAI = !img.src.includes('PIXABAY');
                 const wasSelected = selected.includes(img.id);
                 const isCorrect = (isAI && wasSelected) || (!isAI && !wasSelected);
@@ -644,7 +698,7 @@ Devvit.addCustomPostType({
                       {wasSelected ? "You selected this as AI" : "You didn't select this as AI"}
                     </text>
                     <text size="small" color="#6c757d">
-                      {Math.floor(Math.random() * 100)}% of people selected this as AI
+                      {aiPercentages[index + 2]}% of people selected this as AI
                     </text>
                   </vstack>
                 );
