@@ -167,19 +167,39 @@ Devvit.addMenuItem({
     
     // Store post initialization data in Redis
     try {
-      // Select a random category from available topics
-      const categories = getUniqueTopics();
-      const randomCategory = categories[Math.floor(Math.random() * categories.length)];
+      // Get all available topics and previously used categories
+      const uniqueTopics = getUniqueTopics();
+      const previousCategories = await redis.get('previousCategories') || '[]';
+      const usedCategories = JSON.parse(previousCategories);
+      
+      // Find the first topic that hasn't been used
+      let selectedTopic = '';
+      for (const topic of uniqueTopics) {
+        if (!usedCategories.includes(topic)) {
+          selectedTopic = topic;
+          break;
+        }
+      }
+      
+      // If all topics have been used, reset the set
+      if (!selectedTopic) {
+        await redis.set('previousCategories', '[]');
+        selectedTopic = uniqueTopics[0];
+      }
       
       // Store the category in Redis under post_category:[postId]
       const postCategoryKey = `post_category:${post.id}`;
-      await redis.set(postCategoryKey, randomCategory);
+      await redis.set(postCategoryKey, selectedTopic);
+      
+      // Add the new category to the set of used categories
+      usedCategories.push(selectedTopic);
+      await redis.set('previousCategories', JSON.stringify(usedCategories));
       
       // Set initialization flags
-      await redis.set(`post_initialized:${post.id}`, 'false');
-      await redis.set(`post_category_set:${post.id}`, 'false');
+      await redis.set(`post_initialized:${post.id}`, 'true');
+      await redis.set(`post_category_set:${post.id}`, 'true');
       
-      console.log(`Post ${post.id} assigned category: ${randomCategory} with initialization flags`);
+      console.log(`Post ${post.id} assigned category: ${selectedTopic} with initialization flags`);
     } catch (error) {
       console.error('Error storing category in Redis:', error);
     }
@@ -255,13 +275,33 @@ Devvit.addMenuItem({
       
       // Store post initialization data in Redis
       const uniqueTopics = getUniqueTopics();
-      const randomCategory = uniqueTopics[Math.floor(Math.random() * uniqueTopics.length)];
-      const postCategoryKey = `post_category:${post.id}`;
+      const previousCategories = await redis.get('previousCategories') || '[]';
+      const usedCategories = JSON.parse(previousCategories);
       
-      await redis.set(postCategoryKey, randomCategory);
+      // Find the first topic that hasn't been used
+      let selectedTopic = '';
+      for (const topic of uniqueTopics) {
+        if (!usedCategories.includes(topic)) {
+          selectedTopic = topic;
+          break;
+        }
+      }
+      
+      // If all topics have been used, reset the set
+      if (!selectedTopic) {
+        await redis.set('previousCategories', '[]');
+        selectedTopic = uniqueTopics[0];
+      }
+      
+      const postCategoryKey = `post_category:${post.id}`;
+      await redis.set(postCategoryKey, selectedTopic);
+      
+      // Add the new category to the set of used categories
+      usedCategories.push(selectedTopic);
+      await redis.set('previousCategories', JSON.stringify(usedCategories));
       
       // Get shuffled images for the selected topic
-      const selectedImages = getShuffledImagesForTopic(randomCategory, post.id);
+      const selectedImages = getShuffledImagesForTopic(selectedTopic, post.id);
       
       // Store the selected images in Redis
       const postImagesKey = `post_images:${post.id}`;
@@ -271,11 +311,9 @@ Devvit.addMenuItem({
       await redis.set(`post_initialized:${post.id}`, 'true');
       await redis.set(`post_category_set:${post.id}`, 'true');
       
-      console.log(`Initial auto-post ${post.id} assigned category: ${randomCategory} with initialization flags`);
+      console.log(`Initial auto-post ${post.id} assigned category: ${selectedTopic} with initialization flags`);
       
       // Schedule the job to run every 6 hours
-      // Cron format: minute hour day month day-of-week
-      // "0 */6 * * *" means "at minute 0, every 6th hour, every day"
       const jobId = await scheduler.runJob({
         name: AUTO_POST_JOB_NAME,
         cron: '0 */6 * * *'
@@ -283,8 +321,6 @@ Devvit.addMenuItem({
       
       // Store the job ID so we can cancel it later if needed
       await redis.set(AUTO_POST_JOB_ID_KEY, jobId);
-      
-      // No need to update settings here, we're using Redis to track job status
       
       ui.showToast({ 
         text: 'Auto-posting scheduled successfully! A new post will be created every 6 hours.',
