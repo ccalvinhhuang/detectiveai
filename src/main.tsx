@@ -151,7 +151,7 @@ Devvit.addTrigger({
 
 // Menu item to create a single post
 Devvit.addMenuItem({
-  label: 'Make my experience post MQ 3/26',
+  label: 'Make my experience post CY 3/27',
   location: 'subreddit',
   forUserType: 'moderator',
   onPress: async (_event, context) => {

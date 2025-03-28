@@ -25,5 +25,5 @@ dist/assets/
 assets/
 dist/assets/
 devvit.yaml
-src/imageData.json
 dist/index.html
+src/imageData.json
