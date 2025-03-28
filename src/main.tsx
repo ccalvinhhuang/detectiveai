@@ -454,47 +454,20 @@ Devvit.addCustomPostType({
       });
     }
 
-    // Load category from Redis - fetch it before the component renders
-    let storedCategory: string | null = null;
-    try {
-      // This is just to initialize the variable, we'll use it later in a non-async way
-      // This will execute synchronously when the component renders
-      const postCategoryKey = `post_category:${context.postId}`;
-      context.redis.get(postCategoryKey).then(category => {
-        // We can't use the result here, but we can store it for later use
-        if (category) {
-          storedCategory = category;
-          
-          // If needed, regenerate images with the stored category
-          const newData = generateImagesFromPostId();
-          setImages(newData.images);
-          setCategory(newData.category);
-        }
-      }).catch(error => {
-        console.error('Error fetching category from Redis:', error);
-      });
-    } catch (error) {
-      console.error('Error fetching category from Redis:', error);
-    }
-    
     // Generate the images based on postId
     const generateImagesFromPostId = () => {
-      // Use stored category if available, otherwise generate deterministically
-      const determinedCategory = storedCategory || (() => {
-        // Generate deterministic category based on postId
-        const categories = getUniqueTopics();
-        let hash = 0;
-        if (context.postId) {
-          for (let i = 0; i < context.postId.length; i++) {
-            hash = (hash + context.postId.charCodeAt(i)) % categories.length;
-          }
+      // Generate deterministic category based on postId
+      const categories = getUniqueTopics();
+      let hash = 0;
+      if (context.postId) {
+        for (let i = 0; i < context.postId.length; i++) {
+          hash = (hash + context.postId.charCodeAt(i)) % categories.length;
         }
-        return categories[hash];
-      })();
+      }
+      const determinedCategory = categories[hash];
       
       // Get images for the determined category
-      const categoryName = typeof determinedCategory === 'string' ? determinedCategory : 'gymnastics';
-      const categoryImages = getImagesForTopic(categoryName);
+      const categoryImages = getImagesForTopic(determinedCategory);
       
       // Use a deterministic shuffle based on postId
       const selectedImages = categoryImages
@@ -520,7 +493,7 @@ Devvit.addCustomPostType({
     const [isGameFinished, setIsGameFinished] = useState(false);
     const [images, setImages] = useState<ImageEntry[]>(generatedData.images);
     const [viewImagesMode, setViewImagesMode] = useState(false);
-    const [category, setCategory] = useState<string>(typeof generatedData.category === 'string' ? generatedData.category : '');
+    const [category, setCategory] = useState<string>(generatedData.category);
     const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
     const [aiPercentages, setAiPercentages] = useState<number[]>([0, 0, 0, 0]);
 
@@ -646,10 +619,10 @@ Devvit.addCustomPostType({
       const lowScore = score < 2;
 
       return (
-        <vstack height="100%" width="100%" gap="none" alignment="center top" padding="none">
-          <text size="xxlarge" weight="bold" color="#3366cc">Results</text>
-          <text size="xlarge">Your score: {score} / 4</text>
-          <text color={perfectScore ? "#2a9d8f" : (goodScore ? "#e9c46a" : "#e63946")} weight="bold" size="large">
+        <vstack height="100%" width="100%" gap="none" alignment="center top" padding="none" backgroundColor="#F6F7F8">
+          <text size="xxlarge" weight="bold" color="#0079D3">Results</text>
+          <text size="xlarge" color="#1A1A1B">Your score: {score} / 4</text>
+          <text color={perfectScore ? "#46D160" : (goodScore ? "#FF5700" : "#EA0027")} weight="bold" size="large">
             {perfectScore 
               ? "Perfect! You correctly identified all images!" 
               : (goodScore 
@@ -671,10 +644,10 @@ Devvit.addCustomPostType({
                       imageHeight={180} 
                       imageWidth={180}
                     />
-                    <text color={isCorrect ? "#2a9d8f" : "#e63946"} weight="bold" size="small">
+                    <text color={isCorrect ? "#46D160" : "#EA0027"} weight="bold" size="small">
                       {wasSelected ? "You selected this as AI" : "You didn't select this as AI"}
                     </text>
-                    <text size="small" color="#6c757d">
+                    <text size="small" color="#878A8C">
                       {aiPercentages[index]}% of people selected this as AI
                     </text>
                   </vstack>
@@ -694,10 +667,10 @@ Devvit.addCustomPostType({
                       imageHeight={180} 
                       imageWidth={180}
                     />
-                    <text color={isCorrect ? "#2a9d8f" : "#e63946"} weight="bold" size="small">
+                    <text color={isCorrect ? "#46D160" : "#EA0027"} weight="bold" size="small">
                       {wasSelected ? "You selected this as AI" : "You didn't select this as AI"}
                     </text>
-                    <text size="small" color="#6c757d">
+                    <text size="small" color="#878A8C">
                       {aiPercentages[index + 2]}% of people selected this as AI
                     </text>
                   </vstack>
@@ -715,11 +688,11 @@ Devvit.addCustomPostType({
       const selectedCount = selected.length;
 
       return (
-        <vstack height="100%" width="100%" gap="none" alignment="center top" padding="none">
+        <vstack height="100%" width="100%" gap="none" alignment="center top" padding="none" backgroundColor="#F6F7F8">
           <spacer size="small" />
-          <text size="xxlarge" weight="bold" color="#3366cc">Spot the AI-Generated Images!</text>
-          <text size="small">Select ALL images that you believe were created by AI (or none if you think all are real)</text>
-          <text size="small" weight="bold" color="#6c757d">Category: {category}</text>
+          <text size="xxlarge" weight="bold" color="#0079D3">Spot the AI-Generated Images!</text>
+          <text size="small" color="#1A1A1B">Select ALL images that you believe were created by AI (or none if you think all are real)</text>
+          <text size="small" weight="bold" color="#878A8C">Category: {category}</text>
           <spacer size="small" />
 
           <vstack gap="small" width="95%" alignment="center middle">
@@ -755,8 +728,8 @@ Devvit.addCustomPostType({
               </hstack>
 
               <hstack gap="medium" width="100%" alignment="center">
-                <text size="medium" color="#6c757d">Image {currentImageIndex + 1} of {images.length}</text>
-                <text size="medium" color="#6c757d">Selected as AI: {selectedCount} image{selectedCount !== 1 ? 's' : ''}</text>
+                <text size="medium" color="#878A8C">Image {currentImageIndex + 1} of {images.length}</text>
+                <text size="medium" color="#878A8C">Selected as AI: {selectedCount} image{selectedCount !== 1 ? 's' : ''}</text>
               </hstack>
             </vstack>
           </vstack>
@@ -764,70 +737,10 @@ Devvit.addCustomPostType({
       );
     }
 
+    // Default return to satisfy TypeScript (this should never be reached)
     return (
-      <vstack height="100%" width="100%" gap="small" alignment="center top" padding="small">
-        <spacer size="small" />
-        <text size="xlarge" weight="bold" color="#3366cc">Spot the AI-Generated Images!</text>
-        <text size="medium">Select ALL images that you believe were created by AI (or none if you think all are real)</text>
-        {category && <text size="medium" weight="bold" color="#6c757d">Category: {category}</text>}
-
-        <vstack gap="medium" width="95%" alignment="center middle" padding="small">
-          <hstack gap="medium" width="100%" alignment="center">
-            {images.slice(0, 2).map((entry) => {
-              const isSelected = selected.includes(entry.id);
-              return (
-                <vstack key={entry.id} gap="small" alignment="center middle" width="240px">
-                  <image 
-                    url={entry.src}
-                    imageHeight={200} 
-                    imageWidth={200}
-                  />
-                  <button
-                    onPress={() => toggleSelected(entry.id)}
-                    appearance={isSelected ? "primary" : "secondary"}
-                    size="medium"
-                  >
-                    {entry.label}
-                  </button>
-                </vstack>
-              );
-            })}
-          </hstack>
-          <hstack gap="medium" width="100%" alignment="center">
-            {images.slice(2, 4).map((entry) => {
-              const isSelected = selected.includes(entry.id);
-              return (
-                <vstack key={entry.id} gap="small" alignment="center middle" width="240px">
-                  <image 
-                    url={entry.src}
-                    imageHeight={200} 
-                    imageWidth={200}
-                  />
-                  <button
-                    onPress={() => toggleSelected(entry.id)}
-                    appearance={isSelected ? "primary" : "secondary"}
-                    size="medium"
-                  >
-                    {entry.label}
-                  </button>
-                </vstack>
-              );
-            })}
-          </hstack>
-        </vstack>
-
-        <spacer size="medium" />
-
-        <vstack width="300px" alignment="center">
-          <button
-            onPress={handleSubmit}
-            size="large"
-            appearance="primary"
-          >
-            SUBMIT
-          </button>
-        </vstack>
-        <spacer size="small" />
+      <vstack height="100%" width="100%" gap="small" alignment="center top" padding="small" backgroundColor="#F6F7F8">
+        <text size="xlarge" weight="bold" color="#0079D3">Loading...</text>
       </vstack>
     );
   },
