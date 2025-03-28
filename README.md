@@ -2,6 +2,14 @@
 
 A Reddit app built with Devvit for detecting AI-generated images.
 
+### HOW TO PLAY
+
+1. Each game shows 4 images from a specific category (e.g., butterflies, whales, gymnastics)
+2. Your task is to identify which images were created by AI
+3. You can select multiple images as AI-generated
+4. After submitting, you'll see your score and how other players voted
+5. A perfect score (4/4) means you correctly identified all AI and real images, with the color of the text denoting if your guess was correct (green) or wrong (red).
+
 ### Tech Stack
 
 - [Devvit](https://developers.reddit.com/docs/): Reddit's Developer Platform that lets you build powerful apps and experiences to enhance the communities you love.
