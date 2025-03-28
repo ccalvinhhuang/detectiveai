@@ -21,3 +21,9 @@ dist/assets/
 .env.development.local
 .env.test.local
 .env.production.local
+
+assets/
+dist/assets/
+devvit.yaml
+src/imageData.json
+dist/index.html
